@@ -1,28 +1,48 @@
-import {wait} from '../src/wait'
-import * as process from 'process'
-import * as cp from 'child_process'
-import * as path from 'path'
+import * as github from '@actions/github'
+import {WebhookPayload} from '@actions/github/lib/interfaces'
+import fs from 'fs'
+import yaml from 'js-yaml'
 
-test('throws invalid number', async () => {
-  const input = parseInt('foo', 10)
-  await expect(wait(input)).rejects.toThrow('milliseconds not a number')
+import * as core from '@actions/core'
+import run from '../src/main'
+
+const mockInputs = {
+  INPUT_GITHUB_TOKEN: 'mockToken',
+  INPUT_BRANCHES: 'develop,staging'
+}
+
+beforeEach(() => {
+  jest.resetModules()
+  const doc = yaml.load(
+    fs.readFileSync(__dirname + '/../action.yml', 'utf8')
+  ) as any
+  Object.keys(mockInputs).forEach(name => {
+    process.env[name] = mockInputs[name as keyof typeof mockInputs]
+  })
+  github.context.payload = {
+    pusher: {
+      name: 'mona'
+    }
+  } as WebhookPayload
 })
 
-test('wait 500 ms', async () => {
-  const start = new Date()
-  await wait(500)
-  const end = new Date()
-  var delta = Math.abs(end.getTime() - start.getTime())
-  expect(delta).toBeGreaterThan(450)
+afterEach(() => {
+  Object.keys(mockInputs).forEach(name => {
+    delete process.env[name]
+  })
 })
 
-// shows how the runner will run a javascript action with env / stdout protocol
-test('test runs', () => {
-  process.env['INPUT_MILLISECONDS'] = '500'
-  const np = process.execPath
-  const ip = path.join(__dirname, '..', 'lib', 'main.js')
-  const options: cp.ExecFileSyncOptions = {
-    env: process.env
-  }
-  console.log(cp.execFileSync(np, [ip], options).toString())
+describe('test action', () => {
+  it('expects github token', async () => {
+    const debugMock = jest.spyOn(core, 'debug')
+    await run()
+    expect(debugMock).toHaveBeenCalled()
+    expect(debugMock).toHaveBeenCalledWith(mockInputs.INPUT_GITHUB_TOKEN)
+  })
+  it('expects list of branches', async () => {
+    const debugMock = jest.spyOn(core, 'debug')
+    await run()
+    expect(debugMock).toHaveBeenCalled()
+    expect(debugMock).toHaveBeenCalledWith(mockInputs.INPUT_BRANCHES)
+  })
 })

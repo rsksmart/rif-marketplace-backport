@@ -5,6 +5,9 @@ inputs:
   github_token:
     description: Token for the GitHub API.
     required: true
+  branches:
+    description: Branches for backporting
+    required: true
 runs:
   using: 'node12'
   main: 'dist/index.js'
