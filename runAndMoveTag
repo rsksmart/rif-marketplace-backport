@@ -1,0 +1,8 @@
+# /bin/bash
+
+npm run all && git add . \
+&& git commit --amend -C HEAD \
+&& git push -f \
+&& git push origin :refs/tags/v1 \
+&& git tag -fa v1 -m "no" \
+&& git push origin main --tags \

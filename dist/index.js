@@ -36,12 +36,113 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable github/no-then */
 const core = __importStar(__webpack_require__(2186));
 const exec_1 = __webpack_require__(1514);
 const github = __importStar(__webpack_require__(5438));
+// type PullRequest = WebhookPayload['pull_request']
 const createGit = (repoName) => (...args) => __awaiter(void 0, void 0, void 0, function* () {
     yield exec_1.exec('git', args, { cwd: repoName });
+});
+const cloneRepo = (token, login, repoName) => __awaiter(void 0, void 0, void 0, function* () {
+    yield exec_1.exec('git', [
+        'clone',
+        `https://x-access-token:${token}@github.com/${login}/${repoName}.git`
+    ]);
+    yield exec_1.exec('git', [
+        'config',
+        '--global',
+        'user.email',
+        'github-actions[bot]@users.noreply.github.com'
+    ]);
+    yield exec_1.exec('git', ['config', '--global', 'user.name', 'github-actions[bot]']);
+});
+const getAllPullsByLoginNRepo = (octokit, login, repoName) => __awaiter(void 0, void 0, void 0, function* () {
+    return yield octokit.rest.pulls.list({
+        owner: login,
+        repo: repoName
+    });
+});
+const createBackport = ({ branch, login, repoName, prNumber, prCommit, prTitle, octokit }) => __awaiter(void 0, void 0, void 0, function* () {
+    const git = createGit(repoName);
+    const newBranchName = `backport-${prNumber}-to-${branch}`;
+    core.info(`Backporting ${prCommit} from #${prNumber}`);
+    const body = `Backport ${prCommit} from #${prNumber}`;
+    yield git('switch', branch);
+    yield git('fetch', '--all');
+    yield git('switch', '--create', newBranchName);
+    yield git('cherry-pick', '-x', '--strategy=recursive', '--diff-algorithm=patience', '--rerere-autoupdate', prCommit).catch((error) => __awaiter(void 0, void 0, void 0, function* () {
+        yield git('cherry-pick', '--abort');
+        throw error;
+    }));
+    yield git('push', '--set-upstream', 'origin', newBranchName);
+    const newPR = yield octokit.rest.pulls.create({
+        base: branch,
+        head: newBranchName,
+        owner: login,
+        repo: repoName,
+        title: `chore(backport): ${prTitle}`,
+        body
+    });
+    core.debug(JSON.stringify(newPR));
+});
+const processPullRequest = ({ login, repoName, branchesInput, pull_request: { base: { ref: baseBranch }, head: { sha: prCommit }, commits: commitCount, title: prTitle, number: prNumber }, octokit, token }) => __awaiter(void 0, void 0, void 0, function* () {
+    core.error(`🐞 ᨟ ~ file: main.ts ~ line 122 ~ baseBranch ${baseBranch}`);
+    core.error(`🐞 ᨟ ~ file: main.ts ~ line 122 ~ prCommit ${prCommit}`);
+    core.error(`🐞 ᨟ ~ file: main.ts ~ line 122 ~ commitCount ${commitCount}`);
+    core.error(`🐞 ᨟ ~ file: main.ts ~ line 122 ~ prTitle ${prTitle}`);
+    core.error(`🐞 ᨟ ~ file: main.ts ~ line 122 ~ prNumber ${prNumber}`);
+    if (commitCount > 1) {
+        core.setFailed('Hotfix PR has to contain only a single commit. Please squash.');
+        return;
+    }
+    const branches = branchesInput.filter(branch => branch !== baseBranch);
+    cloneRepo(token, login, repoName);
+    for (const branch of branches) {
+        createBackport({
+            branch,
+            login,
+            repoName,
+            prNumber,
+            prCommit,
+            prTitle,
+            octokit
+        });
+    }
+});
+const processCommitPush = ({ login, repoName, contextSha, branchesInput, octokit, token }) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const existingPRs = ((_a = (yield getAllPullsByLoginNRepo(octokit, login, repoName))) === null || _a === void 0 ? void 0 : _a.data) || [];
+    core.error(`existingPRs: ${JSON.stringify(existingPRs)}`);
+    core.info(`checking context sha: ${contextSha} against existingPRs: ${existingPRs.map(({ head: { sha } }) => sha)}`);
+    const ourPR = existingPRs.find(({ head: { sha } }) => sha === contextSha);
+    if (!(ourPR === null || ourPR === void 0 ? void 0 : ourPR.number)) {
+        core.info('There no PR for this hotfix yet.');
+        return;
+    }
+    const { base: { ref: baseBranch }, number } = ourPR;
+    const { commits: commitCount, title: prTitle, number: prNumber } = (yield octokit.rest.pulls.get({
+        owner: login,
+        repo: repoName,
+        pull_number: number
+    })).data;
+    if (commitCount > 1) {
+        core.setFailed('Hotfix PR has to contain only a single commit. Please squash.');
+        return;
+    }
+    const branches = branchesInput.filter(branch => branch !== baseBranch);
+    cloneRepo(token, login, repoName);
+    for (const branch of branches) {
+        createBackport({
+            branch,
+            login,
+            repoName,
+            prNumber,
+            prCommit: contextSha,
+            prTitle,
+            octokit
+        });
+    }
 });
 function run() {
     return __awaiter(this, void 0, void 0, function* () {
@@ -49,58 +150,34 @@ function run() {
             const token = core.getInput('github_token');
             core.debug(token);
             const octokit = github.getOctokit(token);
-            const branchesInput = core.getInput('branches');
-            core.debug(branchesInput);
-            const { 
-            // action,
-            pull_request, repository } = github.context.payload;
-            const pullRequestCommit = String(pull_request === null || pull_request === void 0 ? void 0 : pull_request.merge_commit_sha);
-            // const pullRequestTitle = pull_request?.title
-            const owner = repository === null || repository === void 0 ? void 0 : repository.owner.login;
-            const repoName = repository === null || repository === void 0 ? void 0 : repository.name;
-            const branches = branchesInput.split(',');
-            yield exec_1.exec('git', [
-                'clone',
-                `https://x-access-token:${token}@github.com/${owner}/${repoName}.git`
-            ]);
-            yield exec_1.exec('git', [
-                'config',
-                '--global',
-                'user.email',
-                'github-actions[bot]@users.noreply.github.com'
-            ]);
-            yield exec_1.exec('git', [
-                'config',
-                '--global',
-                'user.name',
-                'github-actions[bot]'
-            ]);
-            for (const branch of branches) {
-                const head = `backport-${pull_request === null || pull_request === void 0 ? void 0 : pull_request.number}-to-${branch}`;
-                core.info(`Backporting ${pullRequestCommit} from #${pull_request === null || pull_request === void 0 ? void 0 : pull_request.number}`);
-                const git = createGit(repoName);
-                const body = `Backport ${pullRequestCommit} from #${pull_request === null || pull_request === void 0 ? void 0 : pull_request.number}`;
-                yield git('switch', branch);
-                yield git('fetch', '--all');
-                yield git('switch', '--create', head);
-                try {
-                    yield git('cherry-pick', pullRequestCommit);
-                }
-                catch (error) {
-                    yield git('cherry-pick', '--abort');
-                    throw error;
-                }
-                yield git('push', '--set-upstream', 'origin', head);
-                const newPR = yield octokit.pulls.create({
-                    branch,
-                    body,
-                    head,
-                    owner,
+            const branchesInput = core.getInput('branches').split(',');
+            core.debug(String(branchesInput));
+            const { eventName, sha: contextSha, payload: { repository, action: payloadAction, pull_request } } = github.context;
+            core.error(`pull request: ${JSON.stringify(pull_request)}`);
+            if (!repository)
+                throw Error('Something is wrong. Repository does not seem to exist.');
+            const { owner: { login }, name: repoName } = repository;
+            const action = payloadAction !== null && payloadAction !== void 0 ? payloadAction : eventName;
+            core.info(`action: ${action}`);
+            if (!action)
+                throw Error('Something is wrong. There does not seem to be any action or event name.');
+            if (pull_request)
+                return yield processPullRequest({
+                    login,
                     repoName,
-                    title: 'chore(sync): hotfix merge'
+                    branchesInput,
+                    pull_request,
+                    octokit,
+                    token
                 });
-                core.debug(newPR);
-            }
+            return yield processCommitPush({
+                login,
+                repoName,
+                contextSha,
+                branchesInput,
+                octokit,
+                token
+            });
         }
         catch (error) {
             core.setFailed(error.message);
