@@ -106,6 +106,7 @@ const core = __importStar(__webpack_require__(2186));
 const github = __importStar(__webpack_require__(5438));
 const processCommitPush_1 = __webpack_require__(7965);
 const processPullRequest_1 = __webpack_require__(6754);
+const ALLOWED_ACTIONS = ['push', 'opened', 'closed'];
 function run() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
@@ -115,14 +116,18 @@ function run() {
             const branchesInput = core.getInput('branches').split(',');
             core.debug(String(branchesInput));
             const { eventName, sha: contextSha, payload: { repository, action: payloadAction, pull_request } } = github.context;
-            core.error(`pull request: ${JSON.stringify(pull_request)}`);
+            // core.error(`pull request: ${JSON.stringify(pull_request)}`)
             if (!repository)
                 throw Error('Something is wrong. Repository does not seem to exist.');
             const { owner: { login }, name: repoName } = repository;
             const action = payloadAction !== null && payloadAction !== void 0 ? payloadAction : eventName; // action not present on a re-run
             core.info(`action: ${action}`);
-            if (!action)
+            if (!action) {
                 throw Error('Something is wrong. There does not seem to be any action or event name.');
+            }
+            else if (!ALLOWED_ACTIONS.includes(action)) {
+                throw Error(`Action "${action}" is not allowed.`);
+            }
             if (pull_request)
                 return yield processPullRequest_1.processPullRequest({
                     action,
@@ -190,32 +195,36 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.processCommitPush = void 0;
 const core = __importStar(__webpack_require__(2186));
-const createBackport_1 = __webpack_require__(8905);
 const utils_1 = __webpack_require__(918);
-const processCommitPush = ({ login, repoName, contextSha, branchesInput, octokit, token }) => __awaiter(void 0, void 0, void 0, function* () {
+const processCommitPush = ({ login, repoName, contextSha, 
+// branchesInput,
+octokit }) => __awaiter(void 0, void 0, void 0, function* () {
     const pull_request = yield utils_1.getPullRequestBySha(octokit, login, repoName, contextSha);
     if (!pull_request) {
         core.info('There no PR for this hotfix yet.');
         return;
     }
-    const { commits: commitCount, title: prTitle, base: { ref: baseBranch }, number: pull_number } = pull_request;
+    const { commits: commitCount
+    // title: prTitle,
+    // base: {ref: baseBranch},
+    // number: pull_number
+     } = pull_request;
     if (commitCount > 1) {
         core.setFailed('Hotfix PR has to contain only a single commit. Please squash.');
-        return;
     }
-    const branches = branchesInput.filter(branch => branch !== baseBranch);
-    yield utils_1.cloneRepo(token, login, repoName);
-    for (const branch of branches) {
-        yield createBackport_1.createBackport({
-            branch,
-            login,
-            repoName,
-            prNumber: pull_number,
-            prCommit: contextSha,
-            prTitle,
-            octokit
-        });
-    }
+    // const branches = branchesInput.filter(branch => branch !== baseBranch)
+    // await cloneRepo(token, login, repoName)
+    // for (const branch of branches) {
+    //   await createBackport({
+    //     branch,
+    //     login,
+    //     repoName,
+    //     prNumber: pull_number,
+    //     prCommit: contextSha,
+    //     prTitle,
+    //     octokit
+    //   })
+    // }
 });
 exports.processCommitPush = processCommitPush;
 
@@ -260,26 +269,26 @@ exports.processPullRequest = void 0;
 const core = __importStar(__webpack_require__(2186));
 const createBackport_1 = __webpack_require__(8905);
 const utils_1 = __webpack_require__(918);
-const processPullRequest = ({ action, login, repoName, branchesInput, pull_request: { base: { ref: baseBranch }, head: { sha: prCommit }, commits: commitCount, title: prTitle, number: prNumber }, octokit, token }) => __awaiter(void 0, void 0, void 0, function* () {
+const processPullRequest = ({ action, login, repoName, branchesInput, pull_request: { base: { ref: baseBranch }, head: { sha: prCommit }, commits: commitCount, title: prTitle, number: prNumber, merged }, octokit, token }) => __awaiter(void 0, void 0, void 0, function* () {
     if (commitCount > 1) {
         core.setFailed('Hotfix PR has to contain only a single commit. Please squash.');
         return;
     }
     const branches = branchesInput.filter(branch => branch !== baseBranch);
     yield utils_1.cloneRepo(token, login, repoName);
-    if (action === 'closed') {
-        core.error('Do the backports here.');
-    }
-    for (const branch of branches) {
-        yield createBackport_1.createBackport({
-            branch,
-            login,
-            repoName,
-            prNumber,
-            prCommit,
-            prTitle,
-            octokit
-        });
+    if (action === 'closed' && merged) {
+        for (const branch of branches) {
+            yield createBackport_1.createBackport({
+                branch,
+                login,
+                repoName,
+                prNumber,
+                prCommit,
+                prTitle,
+                octokit
+            });
+        }
+        return;
     }
 });
 exports.processPullRequest = processPullRequest;
@@ -352,7 +361,7 @@ exports.getAllPullsByLoginNRepo = getAllPullsByLoginNRepo;
 const getPullRequestBySha = (octokit, login, repoName, contextSha) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
     const existingPRs = ((_a = (yield exports.getAllPullsByLoginNRepo(octokit, login, repoName))) === null || _a === void 0 ? void 0 : _a.data) || [];
-    core.error(`existingPRs: ${JSON.stringify(existingPRs)}`);
+    // core.error(`existingPRs: ${JSON.stringify(existingPRs)}`)
     core.info(`checking context sha: ${contextSha} against existingPRs: ${existingPRs.map(({ head: { sha } }) => sha)}`);
     const pull_number = (_b = existingPRs.find(({ head: { sha } }) => sha === contextSha)) === null || _b === void 0 ? void 0 : _b.number;
     if (!pull_number) {

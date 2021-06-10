@@ -49,7 +49,7 @@ export const getPullRequestBySha = async (
   const existingPRs =
     (await getAllPullsByLoginNRepo(octokit, login, repoName))?.data || []
 
-  core.error(`existingPRs: ${JSON.stringify(existingPRs)}`)
+  // core.error(`existingPRs: ${JSON.stringify(existingPRs)}`)
   core.info(
     `checking context sha: ${contextSha} against existingPRs: ${existingPRs.map(
       ({head: {sha}}) => sha

@@ -4,6 +4,8 @@ import {PullRequest} from '@octokit/webhooks-types'
 import {processCommitPush} from './processCommitPush'
 import {processPullRequest} from './processPullRequest'
 
+const ALLOWED_ACTIONS = ['push', 'opened', 'closed']
+
 async function run(): Promise<void> {
   try {
     const token = core.getInput('github_token')
@@ -19,7 +21,7 @@ async function run(): Promise<void> {
       payload: {repository, action: payloadAction, pull_request}
     } = github.context
 
-    core.error(`pull request: ${JSON.stringify(pull_request)}`)
+    // core.error(`pull request: ${JSON.stringify(pull_request)}`)
 
     if (!repository)
       throw Error('Something is wrong. Repository does not seem to exist.')
@@ -31,10 +33,13 @@ async function run(): Promise<void> {
 
     const action = payloadAction ?? eventName // action not present on a re-run
     core.info(`action: ${action}`)
-    if (!action)
+    if (!action) {
       throw Error(
         'Something is wrong. There does not seem to be any action or event name.'
       )
+    } else if (!ALLOWED_ACTIONS.includes(action)) {
+      throw Error(`Action "${action}" is not allowed.`)
+    }
 
     if (pull_request)
       return await processPullRequest({

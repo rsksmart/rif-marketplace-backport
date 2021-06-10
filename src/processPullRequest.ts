@@ -23,7 +23,8 @@ export const processPullRequest = async ({
     head: {sha: prCommit},
     commits: commitCount,
     title: prTitle,
-    number: prNumber
+    number: prNumber,
+    merged
   },
   octokit,
   token
@@ -38,18 +39,18 @@ export const processPullRequest = async ({
 
   await cloneRepo(token, login, repoName)
 
-  if (action === 'closed') {
-    core.error('Do the backports here.')
-  }
-  for (const branch of branches) {
-    await createBackport({
-      branch,
-      login,
-      repoName,
-      prNumber,
-      prCommit,
-      prTitle,
-      octokit
-    })
+  if (action === 'closed' && merged) {
+    for (const branch of branches) {
+      await createBackport({
+        branch,
+        login,
+        repoName,
+        prNumber,
+        prCommit,
+        prTitle,
+        octokit
+      })
+    }
+    return
   }
 }
