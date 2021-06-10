@@ -32,6 +32,8 @@
     "@octokit/types": "^6.16.2"
   },
   "devDependencies": {
+    "@octokit/openapi-types": "^7.3.0",
+    "@octokit/webhooks-types": "^3.77.1",
     "@types/jest": "^26.0.15",
     "@types/js-yaml": "^4.0.1",
     "@types/node": "^14.14.9",
