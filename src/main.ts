@@ -21,8 +21,6 @@ async function run(): Promise<void> {
       payload: {repository, action: payloadAction, pull_request}
     } = github.context
 
-    // core.error(`pull request: ${JSON.stringify(pull_request)}`)
-
     if (!repository)
       throw Error('Something is wrong. Repository does not seem to exist.')
 
@@ -31,7 +29,7 @@ async function run(): Promise<void> {
       name: repoName
     } = repository
 
-    const action = payloadAction ?? eventName // action not present on a re-run
+    const action = payloadAction ?? eventName // action not present on in push payload
     core.info(`action: ${action}`)
     if (!action) {
       throw Error(

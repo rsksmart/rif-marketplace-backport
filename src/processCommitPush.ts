@@ -1,5 +1,5 @@
 import * as core from '@actions/core'
-import {getPullRequestBySha, Octokit} from './utils'
+import {autoSquash, getPullRequestBySha, Octokit} from './utils'
 
 type ProcessCommitPushProps = {
   login: string
@@ -14,10 +14,9 @@ export const processCommitPush = async ({
   login,
   repoName,
   contextSha,
-  // branchesInput,
-  octokit
-}: // token
-ProcessCommitPushProps): Promise<void> => {
+  octokit,
+  token
+}: ProcessCommitPushProps): Promise<void> => {
   const pull_request = await getPullRequestBySha(
     octokit,
     login,
@@ -30,31 +29,10 @@ ProcessCommitPushProps): Promise<void> => {
   }
 
   const {
-    commits: commitCount
-    // title: prTitle,
-    // base: {ref: baseBranch},
-    // number: pull_number
+    commits: commitCount,
+    title: prTitle,
+    head: {ref: branchName}
   } = pull_request
 
-  if (commitCount > 1) {
-    core.setFailed(
-      'Hotfix PR has to contain only a single commit. Please squash.'
-    )
-  }
-
-  // const branches = branchesInput.filter(branch => branch !== baseBranch)
-
-  // await cloneRepo(token, login, repoName)
-
-  // for (const branch of branches) {
-  //   await createBackport({
-  //     branch,
-  //     login,
-  //     repoName,
-  //     prNumber: pull_number,
-  //     prCommit: contextSha,
-  //     prTitle,
-  //     octokit
-  //   })
-  // }
+  await autoSquash({commitCount, repoName, prTitle, branchName, token, login})
 }

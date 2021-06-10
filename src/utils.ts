@@ -17,17 +17,26 @@ export const cloneRepo = async (
   login: string,
   repoName: string
 ): Promise<void> => {
-  await exec('git', [
-    'clone',
-    `https://x-access-token:${token}@github.com/${login}/${repoName}.git`
-  ])
-  await exec('git', [
-    'config',
-    '--global',
-    'user.email',
-    'github-actions[bot]@users.noreply.github.com'
-  ])
-  await exec('git', ['config', '--global', 'user.name', 'github-actions[bot]'])
+  try {
+    await exec('git', ['status'])
+  } catch {
+    await exec('git', [
+      'clone',
+      `https://x-access-token:${token}@github.com/${login}/${repoName}.git`
+    ])
+    await exec('git', [
+      'config',
+      '--global',
+      'user.email',
+      'github-actions[bot]@users.noreply.github.com'
+    ])
+    await exec('git', [
+      'config',
+      '--global',
+      'user.name',
+      'github-actions[bot]'
+    ])
+  }
 }
 
 export const getAllPullsByLoginNRepo = async (
@@ -49,7 +58,6 @@ export const getPullRequestBySha = async (
   const existingPRs =
     (await getAllPullsByLoginNRepo(octokit, login, repoName))?.data || []
 
-  // core.error(`existingPRs: ${JSON.stringify(existingPRs)}`)
   core.info(
     `checking context sha: ${contextSha} against existingPRs: ${existingPRs.map(
       ({head: {sha}}) => sha
@@ -69,4 +77,33 @@ export const getPullRequestBySha = async (
       pull_number
     })
   ).data
+}
+
+type AutoSquashProps = {
+  commitCount: number
+  repoName: string
+  prTitle: string
+  branchName: string
+  token: string
+  login: string
+}
+export const autoSquash = async ({
+  commitCount,
+  repoName,
+  prTitle,
+  branchName,
+  token,
+  login
+}: AutoSquashProps): Promise<void> => {
+  if (commitCount > 1) {
+    core.warning('Hotfix contains more than one PR. Squashing...')
+    const git = createGitClient(repoName)
+    await cloneRepo(token, login, repoName)
+    await git('checkout', '--track', `origin/${branchName}`)
+
+    await git('reset', '--soft', '--no-quiet', `HEAD~${commitCount - 1}`)
+    await git('commit', '--amend', '-m', prTitle)
+    await git('push', '--force-with-lease', 'origin', `HEAD:${branchName}`)
+    core.info('squashed ☠️')
+  }
 }

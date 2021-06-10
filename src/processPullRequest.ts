@@ -1,7 +1,6 @@
-import * as core from '@actions/core'
 import {PullRequest} from '@octokit/webhooks-types'
 import {createBackport} from './createBackport'
-import {Octokit, cloneRepo} from './utils'
+import {autoSquash, cloneRepo, Octokit} from './utils'
 
 export type ProcessPullRequestProps = {
   action: string
@@ -29,15 +28,17 @@ export const processPullRequest = async ({
   octokit,
   token
 }: ProcessPullRequestProps): Promise<void> => {
-  if (commitCount > 1) {
-    core.setFailed(
-      'Hotfix PR has to contain only a single commit. Please squash.'
-    )
-    return
-  }
-  const branches = branchesInput.filter(branch => branch !== baseBranch)
-
   await cloneRepo(token, login, repoName)
+
+  await autoSquash({
+    commitCount,
+    repoName,
+    prTitle,
+    branchName: prCommit,
+    token,
+    login
+  })
+  const branches = branchesInput.filter(branch => branch !== baseBranch)
 
   if (action === 'closed' && merged) {
     for (const branch of branches) {

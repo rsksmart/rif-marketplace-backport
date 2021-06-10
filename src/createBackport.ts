@@ -1,4 +1,3 @@
-/* eslint-disable github/no-then */
 import * as core from '@actions/core'
 import {Octokit, createGitClient} from './utils'
 
@@ -12,9 +11,7 @@ export type CreateBackportProps = {
   octokit: Octokit
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export type CreteBackport = (props: CreateBackportProps) => Promise<void>
-export const createBackport: CreteBackport = async ({
+export const createBackport = async ({
   branch,
   login,
   repoName,
@@ -22,7 +19,7 @@ export const createBackport: CreteBackport = async ({
   prCommit,
   prTitle,
   octokit
-}): Promise<void> => {
+}: CreateBackportProps): Promise<void> => {
   const git = createGitClient(repoName)
 
   const backportBranch = `backport-${prNumber}-to-${branch}`
@@ -34,18 +31,27 @@ export const createBackport: CreteBackport = async ({
   await git('switch', branch)
   await git('fetch', '--all')
   await git('switch', '--create', backportBranch)
-  await git(
-    'cherry-pick',
-    '-x',
-    '--strategy=recursive',
-    '--diff-algorithm=patience',
-    '--strategy-option=patience',
-    '--rerere-autoupdate',
-    prCommit
-  ).catch(async error => {
-    await git('cherry-pick', '--abort')
-    throw error
-  })
+  try {
+    await git(
+      'cherry-pick',
+      '-x',
+      '--diff-algorithm=patience',
+      '--strategy-option=patience',
+      '--rerere-autoupdate',
+      prCommit
+    )
+  } catch (error) {
+    core.error(`Cherry pick failed with: ${error.message}`)
+    await git('add', '.')
+    await git(
+      'commit',
+      `--message=RESOLVE CONFLICTS AND SQUASH ME!
+
+      When done with conflicts, run:
+      git rebase -i HEAD~ to reword message to:
+      ${prTitle}`
+    )
+  }
 
   await git('push', '--set-upstream', 'origin', backportBranch)
   const newPR = await octokit.rest.pulls.create({

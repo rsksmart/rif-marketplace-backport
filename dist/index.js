@@ -37,7 +37,6 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.createBackport = void 0;
-/* eslint-disable github/no-then */
 const core = __importStar(__webpack_require__(2186));
 const utils_1 = __webpack_require__(918);
 const createBackport = ({ branch, login, repoName, prNumber, prCommit, prTitle, octokit }) => __awaiter(void 0, void 0, void 0, function* () {
@@ -48,10 +47,18 @@ const createBackport = ({ branch, login, repoName, prNumber, prCommit, prTitle, 
     yield git('switch', branch);
     yield git('fetch', '--all');
     yield git('switch', '--create', backportBranch);
-    yield git('cherry-pick', '-x', '--strategy=recursive', '--diff-algorithm=patience', '--strategy-option=patience', '--rerere-autoupdate', prCommit).catch((error) => __awaiter(void 0, void 0, void 0, function* () {
-        yield git('cherry-pick', '--abort');
-        throw error;
-    }));
+    try {
+        yield git('cherry-pick', '-x', '--diff-algorithm=patience', '--strategy-option=patience', '--rerere-autoupdate', prCommit);
+    }
+    catch (error) {
+        core.error(`Cherry pick failed with: ${error.message}`);
+        yield git('add', '.');
+        yield git('commit', `--message=RESOLVE CONFLICTS AND SQUASH ME!
+
+      When done with conflicts, run:
+      git rebase -i HEAD~ to reword message to:
+      ${prTitle}`);
+    }
     yield git('push', '--set-upstream', 'origin', backportBranch);
     const newPR = yield octokit.rest.pulls.create({
         base: branch,
@@ -116,11 +123,10 @@ function run() {
             const branchesInput = core.getInput('branches').split(',');
             core.debug(String(branchesInput));
             const { eventName, sha: contextSha, payload: { repository, action: payloadAction, pull_request } } = github.context;
-            // core.error(`pull request: ${JSON.stringify(pull_request)}`)
             if (!repository)
                 throw Error('Something is wrong. Repository does not seem to exist.');
             const { owner: { login }, name: repoName } = repository;
-            const action = payloadAction !== null && payloadAction !== void 0 ? payloadAction : eventName; // action not present on a re-run
+            const action = payloadAction !== null && payloadAction !== void 0 ? payloadAction : eventName; // action not present on in push payload
             core.info(`action: ${action}`);
             if (!action) {
                 throw Error('Something is wrong. There does not seem to be any action or event name.');
@@ -196,35 +202,14 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.processCommitPush = void 0;
 const core = __importStar(__webpack_require__(2186));
 const utils_1 = __webpack_require__(918);
-const processCommitPush = ({ login, repoName, contextSha, 
-// branchesInput,
-octokit }) => __awaiter(void 0, void 0, void 0, function* () {
+const processCommitPush = ({ login, repoName, contextSha, octokit, token }) => __awaiter(void 0, void 0, void 0, function* () {
     const pull_request = yield utils_1.getPullRequestBySha(octokit, login, repoName, contextSha);
     if (!pull_request) {
         core.info('There no PR for this hotfix yet.');
         return;
     }
-    const { commits: commitCount
-    // title: prTitle,
-    // base: {ref: baseBranch},
-    // number: pull_number
-     } = pull_request;
-    if (commitCount > 1) {
-        core.setFailed('Hotfix PR has to contain only a single commit. Please squash.');
-    }
-    // const branches = branchesInput.filter(branch => branch !== baseBranch)
-    // await cloneRepo(token, login, repoName)
-    // for (const branch of branches) {
-    //   await createBackport({
-    //     branch,
-    //     login,
-    //     repoName,
-    //     prNumber: pull_number,
-    //     prCommit: contextSha,
-    //     prTitle,
-    //     octokit
-    //   })
-    // }
+    const { commits: commitCount, title: prTitle, head: { ref: branchName } } = pull_request;
+    yield utils_1.autoSquash({ commitCount, repoName, prTitle, branchName, token, login });
 });
 exports.processCommitPush = processCommitPush;
 
@@ -236,25 +221,6 @@ exports.processCommitPush = processCommitPush;
 
 "use strict";
 
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -266,16 +232,19 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.processPullRequest = void 0;
-const core = __importStar(__webpack_require__(2186));
 const createBackport_1 = __webpack_require__(8905);
 const utils_1 = __webpack_require__(918);
 const processPullRequest = ({ action, login, repoName, branchesInput, pull_request: { base: { ref: baseBranch }, head: { sha: prCommit }, commits: commitCount, title: prTitle, number: prNumber, merged }, octokit, token }) => __awaiter(void 0, void 0, void 0, function* () {
-    if (commitCount > 1) {
-        core.setFailed('Hotfix PR has to contain only a single commit. Please squash.');
-        return;
-    }
-    const branches = branchesInput.filter(branch => branch !== baseBranch);
     yield utils_1.cloneRepo(token, login, repoName);
+    yield utils_1.autoSquash({
+        commitCount,
+        repoName,
+        prTitle,
+        branchName: prCommit,
+        token,
+        login
+    });
+    const branches = branchesInput.filter(branch => branch !== baseBranch);
     if (action === 'closed' && merged) {
         for (const branch of branches) {
             yield createBackport_1.createBackport({
@@ -330,7 +299,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.getPullRequestBySha = exports.getAllPullsByLoginNRepo = exports.cloneRepo = exports.createGitClient = void 0;
+exports.autoSquash = exports.getPullRequestBySha = exports.getAllPullsByLoginNRepo = exports.cloneRepo = exports.createGitClient = void 0;
 const core = __importStar(__webpack_require__(2186));
 const exec_1 = __webpack_require__(1514);
 const createGitClient = (repoName) => (...args) => __awaiter(void 0, void 0, void 0, function* () {
@@ -338,17 +307,27 @@ const createGitClient = (repoName) => (...args) => __awaiter(void 0, void 0, voi
 });
 exports.createGitClient = createGitClient;
 const cloneRepo = (token, login, repoName) => __awaiter(void 0, void 0, void 0, function* () {
-    yield exec_1.exec('git', [
-        'clone',
-        `https://x-access-token:${token}@github.com/${login}/${repoName}.git`
-    ]);
-    yield exec_1.exec('git', [
-        'config',
-        '--global',
-        'user.email',
-        'github-actions[bot]@users.noreply.github.com'
-    ]);
-    yield exec_1.exec('git', ['config', '--global', 'user.name', 'github-actions[bot]']);
+    try {
+        yield exec_1.exec('git', ['status']);
+    }
+    catch (_a) {
+        yield exec_1.exec('git', [
+            'clone',
+            `https://x-access-token:${token}@github.com/${login}/${repoName}.git`
+        ]);
+        yield exec_1.exec('git', [
+            'config',
+            '--global',
+            'user.email',
+            'github-actions[bot]@users.noreply.github.com'
+        ]);
+        yield exec_1.exec('git', [
+            'config',
+            '--global',
+            'user.name',
+            'github-actions[bot]'
+        ]);
+    }
 });
 exports.cloneRepo = cloneRepo;
 const getAllPullsByLoginNRepo = (octokit, login, repoName) => __awaiter(void 0, void 0, void 0, function* () {
@@ -359,11 +338,10 @@ const getAllPullsByLoginNRepo = (octokit, login, repoName) => __awaiter(void 0, 
 });
 exports.getAllPullsByLoginNRepo = getAllPullsByLoginNRepo;
 const getPullRequestBySha = (octokit, login, repoName, contextSha) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b;
-    const existingPRs = ((_a = (yield exports.getAllPullsByLoginNRepo(octokit, login, repoName))) === null || _a === void 0 ? void 0 : _a.data) || [];
-    // core.error(`existingPRs: ${JSON.stringify(existingPRs)}`)
+    var _b, _c;
+    const existingPRs = ((_b = (yield exports.getAllPullsByLoginNRepo(octokit, login, repoName))) === null || _b === void 0 ? void 0 : _b.data) || [];
     core.info(`checking context sha: ${contextSha} against existingPRs: ${existingPRs.map(({ head: { sha } }) => sha)}`);
-    const pull_number = (_b = existingPRs.find(({ head: { sha } }) => sha === contextSha)) === null || _b === void 0 ? void 0 : _b.number;
+    const pull_number = (_c = existingPRs.find(({ head: { sha } }) => sha === contextSha)) === null || _c === void 0 ? void 0 : _c.number;
     if (!pull_number) {
         core.info('There no PR for this hotfix yet.');
         return;
@@ -375,6 +353,19 @@ const getPullRequestBySha = (octokit, login, repoName, contextSha) => __awaiter(
     })).data;
 });
 exports.getPullRequestBySha = getPullRequestBySha;
+const autoSquash = ({ commitCount, repoName, prTitle, branchName, token, login }) => __awaiter(void 0, void 0, void 0, function* () {
+    if (commitCount > 1) {
+        core.warning('Hotfix contains more than one PR. Squashing...');
+        const git = exports.createGitClient(repoName);
+        yield exports.cloneRepo(token, login, repoName);
+        yield git('checkout', '--track', `origin/${branchName}`);
+        yield git('reset', '--soft', '--no-quiet', `HEAD~${commitCount - 1}`);
+        yield git('commit', '--amend', '-m', prTitle);
+        yield git('push', '--force-with-lease', 'origin', `HEAD:${branchName}`);
+        core.info('squashed ☠️');
+    }
+});
+exports.autoSquash = autoSquash;
 
 
 /***/ }),
