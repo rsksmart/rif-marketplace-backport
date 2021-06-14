@@ -59,16 +59,32 @@ const createBackport = ({ branch, login, repoName, prNumber, prCommit, prTitle, 
       git rebase -i HEAD~ to reword message to:
       ${prTitle}`);
     }
-    yield git('push', '--set-upstream', 'origin', backportBranch);
-    const newPR = yield octokit.rest.pulls.create({
-        base: branch,
-        head: backportBranch,
-        owner: login,
-        repo: repoName,
-        title: `chore(backport): ${prTitle}`,
-        body
-    });
-    core.debug(JSON.stringify(newPR));
+    try {
+        yield git('push', '--set-upstream', 'origin', backportBranch);
+        core.info('Branch pushed');
+        core.info('Creating pull request:.');
+        core.info(`{
+      base: ${branch},
+      head: ${backportBranch},
+      owner: ${login},
+      repo: ${repoName},
+      title: ${`chore(backport): ${prTitle}`},
+      body: ${body}
+    }`);
+        const newPR = yield octokit.rest.pulls.create({
+            base: branch,
+            head: backportBranch,
+            owner: login,
+            repo: repoName,
+            title: `chore(backport): ${prTitle}`,
+            body
+        });
+        core.info('PR created.');
+        core.debug(JSON.stringify(newPR));
+    }
+    catch (error) {
+        core.error(`BOOOOO: ${error}`);
+    }
 });
 exports.createBackport = createBackport;
 
@@ -303,7 +319,21 @@ exports.autoSquash = exports.getPullRequestBySha = exports.getAllPullsByLoginNRe
 const core = __importStar(__webpack_require__(2186));
 const exec_1 = __webpack_require__(1514);
 const createGitClient = (repoName) => (...args) => __awaiter(void 0, void 0, void 0, function* () {
-    yield exec_1.exec('git', args, { cwd: repoName });
+    yield exec_1.exec('git', args, {
+        cwd: repoName
+        // env: {
+        //   ...process.env,
+        //   GIT_TRACE: 'true',
+        //   GIT_CURL_VERBOSE: 'true',
+        //   GIT_SSH_COMMAND: 'ssh -vvv',
+        //   GIT_TRACE_PACK_ACCESS: 'true',
+        //   GIT_TRACE_PACKET: 'true',
+        //   GIT_TRACE_PACKFILE: 'true',
+        //   GIT_TRACE_PERFORMANCE: 'true',
+        //   GIT_TRACE_SETUP: 'true',
+        //   GIT_TRACE_SHALLOW: 'true'
+        // }
+    });
 });
 exports.createGitClient = createGitClient;
 const cloneRepo = (token, login, repoName) => __awaiter(void 0, void 0, void 0, function* () {

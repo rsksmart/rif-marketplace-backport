@@ -53,15 +53,29 @@ export const createBackport = async ({
     )
   }
 
-  await git('push', '--set-upstream', 'origin', backportBranch)
-  const newPR = await octokit.rest.pulls.create({
-    base: branch,
-    head: backportBranch,
-    owner: login,
-    repo: repoName,
-    title: `chore(backport): ${prTitle}`,
-    body
-  })
-
-  core.debug(JSON.stringify(newPR))
+  try {
+    await git('push', '--set-upstream', 'origin', backportBranch)
+    core.info('Branch pushed')
+    core.info('Creating pull request:.')
+    core.info(`{
+      base: ${branch},
+      head: ${backportBranch},
+      owner: ${login},
+      repo: ${repoName},
+      title: ${`chore(backport): ${prTitle}`},
+      body: ${body}
+    }`)
+    const newPR = await octokit.rest.pulls.create({
+      base: branch,
+      head: backportBranch,
+      owner: login,
+      repo: repoName,
+      title: `chore(backport): ${prTitle}`,
+      body
+    })
+    core.info('PR created.')
+    core.debug(JSON.stringify(newPR))
+  } catch (error) {
+    core.error(`BOOOOO: ${error}`)
+  }
 }

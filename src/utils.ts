@@ -9,7 +9,21 @@ export type Octokit = ReturnType<typeof github.getOctokit>
 export const createGitClient = (repoName?: string) => async (
   ...args: string[]
 ) => {
-  await exec('git', args, {cwd: repoName})
+  await exec('git', args, {
+    cwd: repoName
+    // env: {
+    //   ...process.env,
+    //   GIT_TRACE: 'true',
+    //   GIT_CURL_VERBOSE: 'true',
+    //   GIT_SSH_COMMAND: 'ssh -vvv',
+    //   GIT_TRACE_PACK_ACCESS: 'true',
+    //   GIT_TRACE_PACKET: 'true',
+    //   GIT_TRACE_PACKFILE: 'true',
+    //   GIT_TRACE_PERFORMANCE: 'true',
+    //   GIT_TRACE_SETUP: 'true',
+    //   GIT_TRACE_SHALLOW: 'true'
+    // }
+  })
 }
 
 export const cloneRepo = async (
