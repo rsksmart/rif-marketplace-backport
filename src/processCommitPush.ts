@@ -1,5 +1,6 @@
 import * as core from '@actions/core'
-import {autoSquash, getPullRequestBySha, Octokit} from './utils'
+import {autoSquash} from './gitutils'
+import {getPullRequestBySha, Octokit} from './octoUtils'
 
 type ProcessCommitPushProps = {
   login: string

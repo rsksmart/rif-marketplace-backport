@@ -1,5 +1,6 @@
 import * as core from '@actions/core'
-import {Octokit, createGitClient} from './utils'
+import {createGitClient} from './gitutils'
+import {Octokit} from './octoUtils'
 
 export type CreateBackportProps = {
   branch: string

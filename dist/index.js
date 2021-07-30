@@ -38,9 +38,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.createBackport = void 0;
 const core = __importStar(__webpack_require__(2186));
-const utils_1 = __webpack_require__(918);
+const gitutils_1 = __webpack_require__(1961);
 const createBackport = ({ branch, login, repoName, prNumber, prCommit, prTitle, octokit }) => __awaiter(void 0, void 0, void 0, function* () {
-    const git = utils_1.createGitClient(repoName);
+    const git = gitutils_1.createGitClient(repoName);
     const backportBranch = `backport-${prNumber}-to-${branch}`;
     core.info(`Backporting ${prCommit} from #${prNumber}`);
     const body = `Backport ${prCommit} from #${prNumber}`;
@@ -87,6 +87,102 @@ const createBackport = ({ branch, login, repoName, prNumber, prCommit, prTitle, 
     }
 });
 exports.createBackport = createBackport;
+
+
+/***/ }),
+
+/***/ 1961:
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.autoSquash = exports.cloneRepo = exports.createGitClient = void 0;
+const core = __importStar(__webpack_require__(2186));
+const exec_1 = __webpack_require__(1514);
+const createGitClient = (repoName) => (...args) => __awaiter(void 0, void 0, void 0, function* () {
+    yield exec_1.exec('git', args, {
+        cwd: repoName
+        // env: {
+        //   ...process.env,
+        //   GIT_TRACE: 'true',
+        //   GIT_CURL_VERBOSE: 'true',
+        //   GIT_SSH_COMMAND: 'ssh -vvv',
+        //   GIT_TRACE_PACK_ACCESS: 'true',
+        //   GIT_TRACE_PACKET: 'true',
+        //   GIT_TRACE_PACKFILE: 'true',
+        //   GIT_TRACE_PERFORMANCE: 'true',
+        //   GIT_TRACE_SETUP: 'true',
+        //   GIT_TRACE_SHALLOW: 'true'
+        // }
+    });
+});
+exports.createGitClient = createGitClient;
+const cloneRepo = (token, login, repoName) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        yield exec_1.exec('git', ['status']);
+    }
+    catch (_a) {
+        yield exec_1.exec('git', [
+            'clone',
+            `https://x-access-token:${token}@github.com/${login}/${repoName}.git`
+        ]);
+        yield exec_1.exec('git', [
+            'config',
+            '--global',
+            'user.email',
+            'github-actions[bot]@users.noreply.github.com'
+        ]);
+        yield exec_1.exec('git', [
+            'config',
+            '--global',
+            'user.name',
+            'github-actions[bot]'
+        ]);
+    }
+});
+exports.cloneRepo = cloneRepo;
+const autoSquash = ({ commitCount, repoName, prTitle, branchName, token, login }) => __awaiter(void 0, void 0, void 0, function* () {
+    if (commitCount > 1) {
+        core.warning('Hotfix contains more than one PR. Squashing...');
+        const git = exports.createGitClient(repoName);
+        yield exports.cloneRepo(token, login, repoName);
+        yield git('checkout', '--track', `origin/${branchName}`);
+        yield git('reset', '--soft', '--no-quiet', `HEAD~${commitCount - 1}`);
+        yield git('commit', '--amend', '-m', prTitle);
+        yield git('push', '--force-with-lease', 'origin', `HEAD:${branchName}`);
+        core.info('squashed ☠️');
+    }
+});
+exports.autoSquash = autoSquash;
 
 
 /***/ }),
@@ -181,6 +277,90 @@ exports.default = run;
 
 /***/ }),
 
+/***/ 2223:
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var __rest = (this && this.__rest) || function (s, e) {
+    var t = {};
+    for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0)
+        t[p] = s[p];
+    if (s != null && typeof Object.getOwnPropertySymbols === "function")
+        for (var i = 0, p = Object.getOwnPropertySymbols(s); i < p.length; i++) {
+            if (e.indexOf(p[i]) < 0 && Object.prototype.propertyIsEnumerable.call(s, p[i]))
+                t[p[i]] = s[p[i]];
+        }
+    return t;
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.deleteHeadBranch = exports.recoverHeadBranch = exports.getPullRequestBySha = exports.getAllPullsByLoginNRepo = void 0;
+const core = __importStar(__webpack_require__(2186));
+const getAllPullsByLoginNRepo = (octokit, login, repoName) => __awaiter(void 0, void 0, void 0, function* () {
+    return yield octokit.rest.pulls.list({
+        owner: login,
+        repo: repoName
+    });
+});
+exports.getAllPullsByLoginNRepo = getAllPullsByLoginNRepo;
+const getPullRequestBySha = (octokit, login, repoName, contextSha) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    const existingPRs = ((_a = (yield exports.getAllPullsByLoginNRepo(octokit, login, repoName))) === null || _a === void 0 ? void 0 : _a.data) || [];
+    core.info(`checking context sha: ${contextSha} against existingPRs: ${existingPRs.map(({ head: { sha } }) => sha)}`);
+    const pull_number = (_b = existingPRs.find(({ head: { sha } }) => sha === contextSha)) === null || _b === void 0 ? void 0 : _b.number;
+    if (!pull_number) {
+        core.info('There no PR for this hotfix yet.');
+        return;
+    }
+    return (yield octokit.rest.pulls.get({
+        owner: login,
+        repo: repoName,
+        pull_number
+    })).data;
+});
+exports.getPullRequestBySha = getPullRequestBySha;
+const recoverHeadBranch = (octokit, _c) => __awaiter(void 0, void 0, void 0, function* () {
+    var { ref } = _c, rest = __rest(_c, ["ref"]);
+    return octokit.request('POST /repos/{owner}/{repo}/git/refs', Object.assign({ ref: `refs/heads/${ref}` }, rest));
+});
+exports.recoverHeadBranch = recoverHeadBranch;
+const deleteHeadBranch = (octokit, _d) => __awaiter(void 0, void 0, void 0, function* () {
+    var { ref } = _d, rest = __rest(_d, ["ref"]);
+    return octokit.request('DELETE /repos/{owner}/{repo}/git/refs/{ref}', Object.assign({ ref: `heads/${ref}` }, rest));
+});
+exports.deleteHeadBranch = deleteHeadBranch;
+
+
+/***/ }),
+
 /***/ 7965:
 /***/ (function(__unused_webpack_module, exports, __webpack_require__) {
 
@@ -217,15 +397,16 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.processCommitPush = void 0;
 const core = __importStar(__webpack_require__(2186));
-const utils_1 = __webpack_require__(918);
+const gitutils_1 = __webpack_require__(1961);
+const octoUtils_1 = __webpack_require__(2223);
 const processCommitPush = ({ login, repoName, contextSha, octokit, token }) => __awaiter(void 0, void 0, void 0, function* () {
-    const pull_request = yield utils_1.getPullRequestBySha(octokit, login, repoName, contextSha);
+    const pull_request = yield octoUtils_1.getPullRequestBySha(octokit, login, repoName, contextSha);
     if (!pull_request) {
         core.info('There no PR for this hotfix yet.');
         return;
     }
     const { commits: commitCount, title: prTitle, head: { ref: branchName } } = pull_request;
-    yield utils_1.autoSquash({ commitCount, repoName, prTitle, branchName, token, login });
+    yield gitutils_1.autoSquash({ commitCount, repoName, prTitle, branchName, token, login });
 });
 exports.processCommitPush = processCommitPush;
 
@@ -233,55 +414,6 @@ exports.processCommitPush = processCommitPush;
 /***/ }),
 
 /***/ 6754:
-/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
-
-"use strict";
-
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.processPullRequest = void 0;
-const createBackport_1 = __webpack_require__(8905);
-const utils_1 = __webpack_require__(918);
-const processPullRequest = ({ action, login, repoName, branchesInput, pull_request: { base: { ref: baseBranch }, head: { sha: prCommit }, commits: commitCount, title: prTitle, number: prNumber, merged }, octokit, token }) => __awaiter(void 0, void 0, void 0, function* () {
-    yield utils_1.cloneRepo(token, login, repoName);
-    yield utils_1.autoSquash({
-        commitCount,
-        repoName,
-        prTitle,
-        branchName: prCommit,
-        token,
-        login
-    });
-    const branches = branchesInput.filter(branch => branch !== baseBranch);
-    if (action === 'closed' && merged) {
-        for (const branch of branches) {
-            yield createBackport_1.createBackport({
-                branch,
-                login,
-                repoName,
-                prNumber,
-                prCommit,
-                prTitle,
-                octokit
-            });
-        }
-        return;
-    }
-});
-exports.processPullRequest = processPullRequest;
-
-
-/***/ }),
-
-/***/ 918:
 /***/ (function(__unused_webpack_module, exports, __webpack_require__) {
 
 "use strict";
@@ -315,87 +447,68 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.autoSquash = exports.getPullRequestBySha = exports.getAllPullsByLoginNRepo = exports.cloneRepo = exports.createGitClient = void 0;
+exports.processPullRequest = void 0;
 const core = __importStar(__webpack_require__(2186));
-const exec_1 = __webpack_require__(1514);
-const createGitClient = (repoName) => (...args) => __awaiter(void 0, void 0, void 0, function* () {
-    yield exec_1.exec('git', args, {
-        cwd: repoName
-        // env: {
-        //   ...process.env,
-        //   GIT_TRACE: 'true',
-        //   GIT_CURL_VERBOSE: 'true',
-        //   GIT_SSH_COMMAND: 'ssh -vvv',
-        //   GIT_TRACE_PACK_ACCESS: 'true',
-        //   GIT_TRACE_PACKET: 'true',
-        //   GIT_TRACE_PACKFILE: 'true',
-        //   GIT_TRACE_PERFORMANCE: 'true',
-        //   GIT_TRACE_SETUP: 'true',
-        //   GIT_TRACE_SHALLOW: 'true'
-        // }
+const createBackport_1 = __webpack_require__(8905);
+const gitutils_1 = __webpack_require__(1961);
+const octoUtils_1 = __webpack_require__(2223);
+const processPullRequest = ({ action, login, repoName, branchesInput, pull_request: { base: { ref: baseBranch }, head: { sha: prCommit, ref: headBranch }, commits: commitCount, title: prTitle, number: prNumber, merged }, octokit, token }) => __awaiter(void 0, void 0, void 0, function* () {
+    yield gitutils_1.cloneRepo(token, login, repoName);
+    core.info('Attempting to squash.');
+    yield gitutils_1.autoSquash({
+        commitCount,
+        repoName,
+        prTitle,
+        branchName: prCommit,
+        token,
+        login
     });
-});
-exports.createGitClient = createGitClient;
-const cloneRepo = (token, login, repoName) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield exec_1.exec('git', ['status']);
+        core.warning(`Attempting to recover branch ${headBranch} with sha ${prCommit}.`);
+        const recoveredHeadBranch = yield octoUtils_1.recoverHeadBranch(octokit, {
+            owner: login,
+            repo: repoName,
+            ref: headBranch,
+            sha: prCommit
+        });
+        core.info(`Recovered head: ${JSON.stringify(recoveredHeadBranch, null, 2)}`);
+        if (recoveredHeadBranch.status >= 300)
+            throw Error(`Failed to recoved branch ${headBranch} from sha ${prCommit}. Data: ${JSON.stringify(recoveredHeadBranch.data, null, 2)}`);
     }
-    catch (_a) {
-        yield exec_1.exec('git', [
-            'clone',
-            `https://x-access-token:${token}@github.com/${login}/${repoName}.git`
-        ]);
-        yield exec_1.exec('git', [
-            'config',
-            '--global',
-            'user.email',
-            'github-actions[bot]@users.noreply.github.com'
-        ]);
-        yield exec_1.exec('git', [
-            'config',
-            '--global',
-            'user.name',
-            'github-actions[bot]'
-        ]);
+    catch (error) {
+        core.error(`Ref failed with: ${error}`);
     }
-});
-exports.cloneRepo = cloneRepo;
-const getAllPullsByLoginNRepo = (octokit, login, repoName) => __awaiter(void 0, void 0, void 0, function* () {
-    return yield octokit.rest.pulls.list({
-        owner: login,
-        repo: repoName
+    yield gitutils_1.autoSquash({
+        commitCount,
+        repoName,
+        prTitle,
+        branchName: prCommit,
+        token,
+        login
     });
-});
-exports.getAllPullsByLoginNRepo = getAllPullsByLoginNRepo;
-const getPullRequestBySha = (octokit, login, repoName, contextSha) => __awaiter(void 0, void 0, void 0, function* () {
-    var _b, _c;
-    const existingPRs = ((_b = (yield exports.getAllPullsByLoginNRepo(octokit, login, repoName))) === null || _b === void 0 ? void 0 : _b.data) || [];
-    core.info(`checking context sha: ${contextSha} against existingPRs: ${existingPRs.map(({ head: { sha } }) => sha)}`);
-    const pull_number = (_c = existingPRs.find(({ head: { sha } }) => sha === contextSha)) === null || _c === void 0 ? void 0 : _c.number;
-    if (!pull_number) {
-        core.info('There no PR for this hotfix yet.');
+    const branches = branchesInput.filter(branch => branch !== baseBranch);
+    if (action === 'closed' && merged) {
+        for (const branch of branches) {
+            yield createBackport_1.createBackport({
+                branch,
+                login,
+                repoName,
+                prNumber,
+                prCommit,
+                prTitle,
+                octokit
+            });
+        }
+        core.warning(`All done, deleting head branch ${headBranch}..`);
+        yield octoUtils_1.deleteHeadBranch(octokit, {
+            owner: login,
+            repo: repoName,
+            ref: headBranch
+        });
         return;
     }
-    return (yield octokit.rest.pulls.get({
-        owner: login,
-        repo: repoName,
-        pull_number
-    })).data;
 });
-exports.getPullRequestBySha = getPullRequestBySha;
-const autoSquash = ({ commitCount, repoName, prTitle, branchName, token, login }) => __awaiter(void 0, void 0, void 0, function* () {
-    if (commitCount > 1) {
-        core.warning('Hotfix contains more than one PR. Squashing...');
-        const git = exports.createGitClient(repoName);
-        yield exports.cloneRepo(token, login, repoName);
-        yield git('checkout', '--track', `origin/${branchName}`);
-        yield git('reset', '--soft', '--no-quiet', `HEAD~${commitCount - 1}`);
-        yield git('commit', '--amend', '-m', prTitle);
-        yield git('push', '--force-with-lease', 'origin', `HEAD:${branchName}`);
-        core.info('squashed ☠️');
-    }
-});
-exports.autoSquash = autoSquash;
+exports.processPullRequest = processPullRequest;
 
 
 /***/ }),
