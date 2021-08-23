@@ -42,7 +42,7 @@ export const createBackport = async ({
       prCommit
     )
   } catch (error) {
-    core.error(`Cherry pick failed with: ${error.message}`)
+    core.error(`Cherry pick failed with: ${(error as Error).message}`)
     await git('add', '.')
     await git(
       'commit',

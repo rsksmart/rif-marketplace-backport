@@ -227,6 +227,7 @@ const processCommitPush_1 = __webpack_require__(7965);
 const processPullRequest_1 = __webpack_require__(6754);
 const ALLOWED_ACTIONS = ['push', 'opened', 'closed'];
 function run() {
+    var _a, _b, _c;
     return __awaiter(this, void 0, void 0, function* () {
         try {
             const token = core.getInput('github_token');
@@ -246,7 +247,7 @@ function run() {
             else if (!ALLOWED_ACTIONS.includes(action)) {
                 throw Error(`Action "${action}" is not allowed.`);
             }
-            if (pull_request)
+            if ((_c = (_b = (_a = pull_request) === null || _a === void 0 ? void 0 : _a.head) === null || _b === void 0 ? void 0 : _b.ref) === null || _c === void 0 ? void 0 : _c.startsWith('hotfix'))
                 return yield processPullRequest_1.processPullRequest({
                     action,
                     login,
@@ -256,14 +257,16 @@ function run() {
                     octokit,
                     token
                 });
-            return yield processCommitPush_1.processCommitPush({
-                login,
-                repoName,
-                contextSha,
-                branchesInput,
-                octokit,
-                token
-            });
+            if (!payloadAction) {
+                return yield processCommitPush_1.processCommitPush({
+                    login,
+                    repoName,
+                    contextSha,
+                    branchesInput,
+                    octokit,
+                    token
+                });
+            }
         }
         catch (error) {
             core.error(error);
@@ -337,7 +340,7 @@ const getPullRequestBySha = (octokit, login, repoName, contextSha) => __awaiter(
     core.info(`checking context sha: ${contextSha} against existingPRs: ${existingPRs.map(({ head: { sha } }) => sha)}`);
     const pull_number = (_b = existingPRs.find(({ head: { sha } }) => sha === contextSha)) === null || _b === void 0 ? void 0 : _b.number;
     if (!pull_number) {
-        core.info('There no PR for this hotfix yet.');
+        core.info('No PR found for this hotfix yet.');
         return;
     }
     return (yield octokit.rest.pulls.get({
@@ -402,7 +405,7 @@ const octoUtils_1 = __webpack_require__(2223);
 const processCommitPush = ({ login, repoName, contextSha, octokit, token }) => __awaiter(void 0, void 0, void 0, function* () {
     const pull_request = yield octoUtils_1.getPullRequestBySha(octokit, login, repoName, contextSha);
     if (!pull_request) {
-        core.info('There no PR for this hotfix yet.');
+        core.info('No PR found for this hotfix yet.');
         return;
     }
     const { commits: commitCount, title: prTitle, head: { ref: branchName } } = pull_request;

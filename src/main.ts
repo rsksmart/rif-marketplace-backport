@@ -39,7 +39,7 @@ async function run(): Promise<void> {
       throw Error(`Action "${action}" is not allowed.`)
     }
 
-    if (pull_request)
+    if ((pull_request as PullRequest)?.head?.ref?.startsWith('hotfix'))
       return await processPullRequest({
         action,
         login,
@@ -50,17 +50,19 @@ async function run(): Promise<void> {
         token
       })
 
-    return await processCommitPush({
-      login,
-      repoName,
-      contextSha,
-      branchesInput,
-      octokit,
-      token
-    })
+    if (!payloadAction) {
+      return await processCommitPush({
+        login,
+        repoName,
+        contextSha,
+        branchesInput,
+        octokit,
+        token
+      })
+    }
   } catch (error) {
-    core.error(error)
-    core.setFailed(error.message)
+    core.error(error as Error)
+    core.setFailed((error as Error).message)
   }
 }
 

@@ -33,7 +33,7 @@ export const getPullRequestBySha = async (
   const pull_number = existingPRs.find(({head: {sha}}) => sha === contextSha)
     ?.number
   if (!pull_number) {
-    core.info('There no PR for this hotfix yet.')
+    core.info('No PR found for this hotfix yet.')
     return
   }
 

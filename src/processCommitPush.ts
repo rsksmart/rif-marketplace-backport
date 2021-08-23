@@ -25,7 +25,7 @@ export const processCommitPush = async ({
     contextSha
   )
   if (!pull_request) {
-    core.info('There no PR for this hotfix yet.')
+    core.info('No PR found for this hotfix yet.')
     return
   }
 
