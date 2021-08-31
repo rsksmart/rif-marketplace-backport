@@ -8,7 +8,7 @@ import run from '../src/main'
 
 const mockInputs = {
   INPUT_GITHUB_TOKEN: 'mockToken',
-  INPUT_BRANCHES: 'develop,staging'
+  INPUT_BRANCHES: 'develop,mainnet,staging'
 }
 
 const mockPayload: WebhookPayload = {
@@ -45,6 +45,8 @@ describe('test action', () => {
     const debugMock = jest.spyOn(core, 'debug')
     await run()
     expect(debugMock).toHaveBeenCalled()
-    expect(debugMock).toHaveBeenCalledWith(mockInputs.INPUT_BRANCHES)
+    expect(debugMock).toHaveBeenCalledWith(
+      mockInputs.INPUT_BRANCHES.replace(',staging', '')
+    )
   })
 })

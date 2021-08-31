@@ -12,7 +12,10 @@ async function run(): Promise<void> {
     core.debug(token)
     const octokit = github.getOctokit(token)
 
-    const branchesInput = core.getInput('branches').split(',')
+    const branchesInput = core
+      .getInput('branches')
+      .split(',')
+      .filter(b => b !== 'staging') // FIXME: this hack was introduced just until the staging is removed from the ui and cache backport.yml
     core.debug(String(branchesInput))
 
     const {

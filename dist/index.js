@@ -233,7 +233,10 @@ function run() {
             const token = core.getInput('github_token');
             core.debug(token);
             const octokit = github.getOctokit(token);
-            const branchesInput = core.getInput('branches').split(',');
+            const branchesInput = core
+                .getInput('branches')
+                .split(',')
+                .filter(b => b !== 'staging'); // FIXME: this hack was introduced just until the staging is removed from the ui and cache backport.yml
             core.debug(String(branchesInput));
             const { eventName, sha: contextSha, payload: { repository, action: payloadAction, pull_request } } = github.context;
             if (!repository)
